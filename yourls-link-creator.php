@@ -248,8 +248,11 @@ class YOURLSCreator
 			$action		= 'shorturl';
 			$format		= 'JSON';
 			$post_url	= get_permalink($post->ID);
+			
+			$timestamp = time();
+			$signature = md5( $timestamp . $api_key ); 
 
-			$yourls_r	= $yourls.'?signature='.$api_key.'&action='.$action.'&url='.$post_url.'&format='.$format.'';
+			$yourls_r	= $yourls.'?timestamp='.$timestamp.'signature='.$signature.'&action='.$action.'&url='.$post_url.'&format='.$format.'';
 
 			$response	= wp_remote_get( $yourls_r );
 
@@ -314,7 +317,10 @@ class YOURLSCreator
 			$keyword	= $custom_kw;
 			$post_url	= get_permalink($postID);
 
-			$yourls_r	= $yourls.'?signature='.$api_key.'&action='.$action.'&url='.$post_url.'&format='.$format.'&keyword='.$keyword.'';
+			$timestamp = time();
+			$signature = md5( $timestamp . $api_key ); 
+
+			$yourls_r	= $yourls.'?timestamp='.$timestamp.'signature='.$signature.'&action='.$action.'&url='.$post_url.'&format='.$format.'&keyword='.$keyword.'';
 
 			$response	= wp_remote_get( $yourls_r );
 
@@ -484,8 +490,11 @@ class YOURLSCreator
 			$action		= 'url-stats';
 			$format		= 'json';
 			$shorturl	= $yourls_url;
+			
+			$timestamp = time();
+			$signature = md5( $timestamp . $api_key ); 
 
-			$yourls_r	= $yourls.'?signature='.$api_key.'&action='.$action.'&shorturl='.$shorturl.'&format='.$format.'';
+			$yourls_r	= $yourls.'?timestamp='.$timestamp.'signature='.$signature.'&action='.$action.'&shorturl='.$shorturl.'&format='.$format.'';
 
 			$response	= wp_remote_get( $yourls_r );
 
@@ -579,7 +588,10 @@ class YOURLSCreator
 			$format		= 'json';
 			$shorturl	= $yourls_url;
 
-			$yourls_r	= $yourls.'?signature='.$api_key.'&action='.$action.'&shorturl='.$shorturl.'&format='.$format.'';
+			$timestamp = time();
+			$signature = md5( $timestamp . $api_key ); 
+
+			$yourls_r	= $yourls.'?timestamp='.$timestamp.'signature='.$signature.'&action='.$action.'&shorturl='.$shorturl.'&format='.$format.'';
 
 			$response	= wp_remote_get( $yourls_r );
 
@@ -671,7 +683,10 @@ class YOURLSCreator
 			$format		= 'json';
 			$shorturl	= $yourls_url;
 
-			$yourls_r	= $yourls.'?signature='.$api_key.'&action='.$action.'&shorturl='.$shorturl.'&format='.$format.'';
+			$timestamp = time();
+			$signature = md5( $timestamp . $api_key ); 
+
+			$yourls_r	= $yourls.'?timestamp='.$timestamp.'signature='.$signature.'&action='.$action.'&shorturl='.$shorturl.'&format='.$format.'';
 
 			$response	= wp_remote_get( $yourls_r );
 
