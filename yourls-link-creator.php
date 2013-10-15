@@ -252,7 +252,7 @@ class YOURLSCreator
 			$timestamp = time();
 			$signature = md5( $timestamp . $api_key ); 
 
-			$yourls_r	= $yourls.'?timestamp='.$timestamp.'signature='.$signature.'&action='.$action.'&url='.$post_url.'&format='.$format.'';
+			$yourls_r	= $yourls.'?timestamp='.$timestamp.'&signature='.$signature.'&action='.$action.'&url='.$post_url.'&format='.$format.'';
 
 			$response	= wp_remote_get( $yourls_r );
 
@@ -320,7 +320,7 @@ class YOURLSCreator
 			$timestamp = time();
 			$signature = md5( $timestamp . $api_key ); 
 
-			$yourls_r	= $yourls.'?timestamp='.$timestamp.'signature='.$signature.'&action='.$action.'&url='.$post_url.'&format='.$format.'&keyword='.$keyword.'';
+			$yourls_r	= $yourls.'?timestamp='.$timestamp.'&signature='.$signature.'&action='.$action.'&url='.$post_url.'&format='.$format.'&keyword='.$keyword.'';
 
 			$response	= wp_remote_get( $yourls_r );
 
@@ -494,7 +494,7 @@ class YOURLSCreator
 			$timestamp = time();
 			$signature = md5( $timestamp . $api_key ); 
 
-			$yourls_r	= $yourls.'?timestamp='.$timestamp.'signature='.$signature.'&action='.$action.'&shorturl='.$shorturl.'&format='.$format.'';
+			$yourls_r	= $yourls.'?timestamp='.$timestamp.'&signature='.$signature.'&action='.$action.'&shorturl='.$shorturl.'&format='.$format.'';
 
 			$response	= wp_remote_get( $yourls_r );
 
@@ -591,7 +591,7 @@ class YOURLSCreator
 			$timestamp = time();
 			$signature = md5( $timestamp . $api_key ); 
 
-			$yourls_r	= $yourls.'?timestamp='.$timestamp.'signature='.$signature.'&action='.$action.'&shorturl='.$shorturl.'&format='.$format.'';
+			$yourls_r	= $yourls.'?timestamp='.$timestamp.'&signature='.$signature.'&action='.$action.'&shorturl='.$shorturl.'&format='.$format.'';
 
 			$response	= wp_remote_get( $yourls_r );
 
@@ -686,7 +686,7 @@ class YOURLSCreator
 			$timestamp = time();
 			$signature = md5( $timestamp . $api_key ); 
 
-			$yourls_r	= $yourls.'?timestamp='.$timestamp.'signature='.$signature.'&action='.$action.'&shorturl='.$shorturl.'&format='.$format.'';
+			$yourls_r	= $yourls.'?timestamp='.$timestamp.'&signature='.$signature.'&action='.$action.'&shorturl='.$shorturl.'&format='.$format.'';
 
 			$response	= wp_remote_get( $yourls_r );
 
