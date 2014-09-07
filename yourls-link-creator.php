@@ -43,7 +43,6 @@ class YOURLSCreator
 		add_action		( 'admin_enqueue_scripts',		array( $this, 'scripts_styles'		), 10		);
 		add_action		( 'admin_menu',					array( $this, 'yourls_settings'		) 			);
 		add_action		( 'admin_init', 				array( $this, 'reg_settings'		) 			);
-		add_action		( 'do_meta_boxes',				array( $this, 'metabox_yourls'		), 10,	2	);
 		add_action		( 'wp_ajax_create_yourls',		array( $this, 'create_yourls'		)			);
 		add_action		( 'wp_ajax_delete_yourls',		array( $this, 'delete_yourls'		)			);
 		add_action		( 'wp_ajax_stats_yourls',		array( $this, 'stats_yourls'		)			);
@@ -57,6 +56,18 @@ class YOURLSCreator
 		add_filter		( 'get_shortlink',				array( $this, 'yourls_shortlink'	), 10,	3	);
 		add_filter		( 'pre_get_shortlink',			array( $this, 'shortlink_button'	), 2,	2	);
 		add_filter		( 'plugin_action_links',		array( $this, 'quick_link'			), 10,	2	);
+		// Select UI rendering hook depending on ShortURL interface style
+		$yourls_options = get_option('yourls_options');
+		$style = (array_key_exists( 'sty', $yourls_options ) ? $yourls_options['sty'] : 'metabox');
+		switch ($style) 
+		{
+			case 'permalink':
+				add_action		( 'edit_form_after_title',		array( $this, 'yourls_render_permalink'	), 10		);
+				break;
+			case 'metabox':
+			default:
+				add_action		( 'do_meta_boxes',				array( $this, 'metabox_yourls'		), 10,	2	);
+		};
 
 		register_activation_hook			( __FILE__, array( $this, 'schedule_cron'		)			);
 		register_deactivation_hook			( __FILE__, array( $this, 'remove_cron'			)			);
@@ -84,9 +95,11 @@ class YOURLSCreator
 	 */
 
 	public function scripts_styles($hook) {
+		$yourls_options = get_option('yourls_options');
 
 		if ( $hook == 'settings_page_yourls-settings' || $hook == 'post-new.php' || $hook == 'post.php' ) {
-			wp_enqueue_style( 'yourls-admin', plugins_url('/lib/css/yourls-admin.css', __FILE__), array(), YOURS_VER, 'all' );
+			if ($yourls_options['sty'] != 'permalink')
+				wp_enqueue_style( 'yourls-admin', plugins_url('/lib/css/yourls-admin.css', __FILE__), array(), YOURS_VER, 'all' );
 			wp_enqueue_script( 'yourls-ajax', plugins_url('/lib/js/yourls.ajax.js', __FILE__) , array('jquery'), YOURS_VER, true );
 		}
 
@@ -344,12 +357,13 @@ class YOURLSCreator
 			}
 
 			if($data){
+				update_post_meta($postID, '_yourls_url', $data_obj->shorturl);
+				
 				$ret['success'] 	= true;
 				$ret['message'] 	= __('You have created a new YOURLS link', 'wpyourls');
 				$ret['link']		= esc_url( $data_obj->shorturl );
-				$ret['yourlsbox']	= '<p class="yourls-exist-block"><input id="yourls-link" title="click to highlight" class="yourls-link-input" type="text" name="yourls-link" value="'.esc_url( $data_obj->shorturl ).'" readonly="readonly" tabindex="501" onclick="this.focus();this.select()" /><input type="button" class="yourls-delete" value="'. __('Delete Link', 'wpyourls').'" ></p><p class="howto"> '. __('Your YOURLS link has generated 0 clicks.', 'wpyourls') .'</p>';
+				$ret['yourlsbox']	= $this->yourls_exists_html($postID);
 
-				update_post_meta($postID, '_yourls_url', $data_obj->shorturl);
 				echo json_encode($ret);
 				die();
 			}
@@ -429,7 +443,7 @@ class YOURLSCreator
 				// removed it from wordpress and yourls
 				$ret['success'] 	= true;
 				$ret['message'] 	= __('The shortlink has been removed from WordPress and also from YOURLS', 'wpyourls');
-				$ret['yourlsbox']	= '<p class="yourls-create-block"><input id="yourls-keyw" class="yourls-keyw" size="20" type="text" name="yourls-keyw" value="" tabindex="501" /><img class="ajax-loading btn-yourls" src="'.plugins_url('/lib/img/wpspin-light.gif', __FILE__).'"><input type="button" class="button-secondary yourls-api" id="yourls-get" type="text" name="yourls-get" value="Get YOURLS" tabindex="502" /><span class="howto">' . __('optional keyword', 'wpyourls') . '</span></p>';
+				$ret['yourlsbox']	= $this->yourls_create_html();
 
 				delete_post_meta($postID, '_yourls_url');
 				echo json_encode($ret);
@@ -438,7 +452,7 @@ class YOURLSCreator
 				// only removed it from wordpress.. yourls failed
 				$ret['success'] 	= true;
 				$ret['message'] 	= __('The shortlink has been removed from WordPress only. The yourls api call failed: have you installed the "delete" action plugin? Read <a href="https://github.com/claytondaley/yourls-api-delete" target="_blank">this</a>', 'wpyourls');
-				$ret['yourlsbox']	= '<p class="yourls-create-block"><input id="yourls-keyw" class="yourls-keyw" size="20" type="text" name="yourls-keyw" value="" tabindex="501" /><img class="ajax-loading btn-yourls" src="'.plugins_url('/lib/img/wpspin-light.gif', __FILE__).'"><input type="button" class="button-secondary yourls-api" id="yourls-get" type="text" name="yourls-get" value="Get YOURLS" tabindex="502" /><span class="howto">' . __('optional keyword', 'wpyourls') . '</span></p>';
+				$ret['yourlsbox']	= $this->yourls_create_html();
 
 				delete_post_meta($postID, '_yourls_url');
 				echo json_encode($ret);
@@ -824,27 +838,113 @@ class YOURLSCreator
 
 		global $post;
 		$yourls_link	= get_post_meta($post->ID, '_yourls_url', true);
-		$yourls_clicks	= get_post_meta($post->ID, '_yourls_clicks', true);
 
 		if(!empty($yourls_link)) {
-
-			echo '<p class="yourls-exist-block">';
-			echo '<input id="yourls-link" title="click to highlight" class="yourls-link-input" type="text" name="yourls-link" value="'.$yourls_link.'" readonly="readonly" tabindex="501" onclick="this.focus();this.select()" />';
-			echo '<input type="button" class="yourls-delete" value="'. __('Delete Link', 'wpyourls').'" >';
-			echo '</p>';
-			echo '<p class="howto">' . sprintf( _n('Your YOURLS link has generated %d click.', 'Your YOURLS link has generated %d clicks.', $yourls_clicks, 'wpyourls'), $yourls_clicks );
-
+			echo $this->yourls_exists_html($post->ID);
+		} else {
+			echo $this->yourls_create_html();
 		}
+	}
 
-		if(empty($yourls_link)) {
+	/**
+	 * Display YOURLS shortlink in format friendly to permalink region
+	 *
+	 * @return YOURLSCreator
+	 */
 
-			echo '<p class="yourls-create-block">';
-			echo '<input id="yourls-keyw" class="yourls-keyw" size="20" type="text" name="yourls-keyw" value="" tabindex="501" />';
-			echo '<img class="ajax-loading btn-yourls" src="'.plugins_url('/lib/img/wpspin-light.gif', __FILE__).'">';
-			echo '<span class="howto">' . __('optional keyword', 'wpyourls') . '</span>';
-			echo '<input type="button" class="button-secondary yourls-api" id="yourls-get" type="text" name="yourls-get" value="Get YOURLS" tabindex="502" />';
-			echo '</p>';
+	public function yourls_render_permalink() {
+		global $post;
+		$yourls_options = get_option('yourls_options');
+		$yourls_link = get_post_meta($post->ID, '_yourls_url', true);
 
+		if(	empty($yourls_options['api']) || empty($yourls_options['url']) )
+			return;
+
+		// check post status, only display on posts with URLs
+		$status		= get_post_status();
+		if ( $status == 'publish' ||
+			 $status == 'future' ||
+			 $status == 'pending'
+			)
+		{
+			if(!empty($yourls_link)) {
+				echo '<div id="yourls-post-display"  class="hide-if-no-js">' . 
+				$this->yourls_exists_html($post->ID) . 
+				'</div>';
+			} else {
+				echo '<div id="yourls-post-display"  class="hide-if-no-js">' . 
+				$this->yourls_create_html() .
+				'</div>';
+			}
+		}
+	}
+	
+	/**
+	 * Returns input for posts without a shorturl in the current UI mode
+	 *
+	 * @return YOURLSCreator
+	 */
+
+	public function yourls_create_html() {
+		$yourls_options = get_option('yourls_options');
+		switch (array_key_exists( 'sty', $yourls_options ) ? $yourls_options['sty'] : '') 
+		{
+			case 'permalink':
+				return '' . 
+				'<p class="yourls-create-block">' . 
+				'<strong>Shortlink (YoURLs):</strong> ' . 
+				'<span id="sample-permalink" tabindex="-1">http://'.$yourls_options['url'].'/' . 
+				'<input title="optional keyword" id="yourls-keyw" class="yourls-keyw" size="20" type="text" name="yourls-keyw" value="" tabindex="501" />' . 
+				'/</span> ' . 
+				'<input type="button" class="button button-small yourls-api" title="enter a phrse" id="yourls-get" type="text" name="yourls-get" value="Request URL" tabindex="502" /> ' . 
+				'<img class="ajax-loading btn-yourls" src="'.plugins_url('/lib/img/wpspin-light.gif', __FILE__).'">' . 
+//				'<span class="howto">' . __('optional keyword', 'wpyourls') . '</span>' . 
+				'</p>' . 
+				'';
+			case 'metabox':
+			default:
+				return '' . 
+				'<p class="yourls-create-block">' . 
+				'<input id="yourls-keyw" class="yourls-keyw" size="20" type="text" name="yourls-keyw" value="" tabindex="501" />' . 
+				'<img class="ajax-loading btn-yourls" src="'.plugins_url('/lib/img/wpspin-light.gif', __FILE__).'">' . 
+				'<input type="button" class="button-secondary yourls-api" id="yourls-get" type="text" name="yourls-get" value="Get YOURLS" tabindex="502" />' . 
+				'<span class="howto">' . __('optional keyword', 'wpyourls') . '</span>' . 
+				'</p>';
+		}
+	}
+	
+	/**
+	 * Returns input for posts with a shorturl in the current UI mode
+	 *
+	 * @return YOURLSCreator
+	 */
+
+	public function yourls_exists_html($postID) {
+		$yourls_options = get_option('yourls_options');
+		$yourls_link = get_post_meta($postID, '_yourls_url', true);
+		$yourls_clicks = get_post_meta($postID, '_yourls_clicks', true);
+		switch (array_key_exists( 'sty', $yourls_options ) ? $yourls_options['sty'] : '') 
+		{
+			case 'permalink':
+				return '' . 
+				'<p class="yourls-exist-block">' . 
+				'<strong>Shortlink (YoURLs):</strong> ' . 
+				'<span id="sample-permalink" tabindex="-1">http://'.$yourls_options['url'].'/' . 
+				'<input id="yourls-link" title="click to highlight" class="yourls-link-input" type="text" name="yourls-link" value="'. substr( esc_url($yourls_link), strlen($yourls_options['url'])+8 ) .'" readonly="readonly" tabindex="501" onclick="this.focus();this.select()" />' . 
+				'/</span> ' . 
+				'<input type="button" class="button button-small yourls-delete" value="'. __('Delete Link', 'wpyourls').'" > ' . 
+				'<img class="ajax-loading btn-yourls" src="'.plugins_url('/lib/img/wpspin-light.gif', __FILE__).'"> ' . 
+//				'<p class="howto">' . sprintf( _n('Your YOURLS link has generated %d click.', 'Your YOURLS link has generated %d clicks.', $yourls_clicks, 'wpyourls'), $yourls_clicks ) . 
+				'</p>' . 
+				'';
+			case 'metabox':
+			default:
+				return '' .
+				'<p class="yourls-exist-block">' . 
+				'<input id="yourls-link" title="click to highlight" class="yourls-link-input" type="text" name="yourls-link" value="'.esc_url( $yourls_link ).'" readonly="readonly" tabindex="501" onclick="this.focus();this.select()" /> ' . 
+				'<input type="button" class="yourls-delete" value="'. __('Delete Link', 'wpyourls').'" >' . 
+				'</p>' . 
+				'<p class="howto">' . sprintf( _n('Your YOURLS link has generated %d click.', 'Your YOURLS link has generated %d clicks.', $yourls_clicks, 'wpyourls'), $yourls_clicks );
 		}
 	}
 
@@ -1024,11 +1124,23 @@ class YOURLSCreator
 				$yourls_cpt		= (isset($yourls_options['cpt'])	? $yourls_options['cpt']	: 'false'	);
 				$yourls_typ		= (isset($yourls_options['typ'])	? $yourls_options['typ']	: ''		);
 				$yourls_sht		= (isset($yourls_options['sht'])	? $yourls_options['sht']	: 'false'	);
+				$yourls_sty		= (isset($yourls_options['sty'])	? $yourls_options['sty']	: ''		);
 
 				?>
 
 				<table class="form-table yourls-table">
 				<tbody>
+					<tr>
+						<th><label for="yourls_options[url]"><?php _e('ShortURL Style', 'wpyourls') ?></label></th>
+						<td>
+						<p><input type="radio" name="yourls_options[sty]" value="metabox" <?php if ($yourls_sty == '' || $yourls_sty == 'metabox') echo 'checked' ?>> Metabox (default)</p>
+						<p><img style="vertical-align:middle" class="" src="<?php echo plugins_url('/lib/img/metabox.gif', __FILE__); ?>" ></p>
+						<p><input type="radio" name="yourls_options[sty]" value="permalink" <?php if ($yourls_sty == 'permalink') echo 'checked' ?>> Permalink</p>
+						<p><img style="vertical-align:middle" class="" src="<?php echo plugins_url('/lib/img/permalink.gif', __FILE__); ?>" ></p>
+						<p class="description"><?php _e('Select the location of the short-URL controls.', 'wpyourls') ?></p>
+						</td>
+					</tr>
+					
 					<tr>
 						<th><label for="yourls_options[url]"><?php _e('YOURLS Custom URL', 'wpyourls') ?></label></th>
 						<td>
